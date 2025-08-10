@@ -6,7 +6,89 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
+from app import db
 
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255))
+    full_name = db.Column(db.String(120))
+    email = db.Column(db.String(120))
+    phone = db.Column(db.String(30))
+    role = db.Column(db.String(50))  # admin, pc, lc, clinician, coordinator
+    facility_id = db.Column(db.Integer, db.ForeignKey('facilities.id'))
+    approved = db.Column(db.Boolean, default=False)
+    last_login = db.Column(db.DateTime)
+    
+    facility = db.relationship('Facility', back_populates='users')
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+        
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+class Facility(db.Model):
+    __tablename__ = 'facilities'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200))
+    district = db.Column(db.String(100))
+    province = db.Column(db.String(100))
+    location = db.Column(db.String(255))
+    active = db.Column(db.Boolean, default=True)
+    
+    users = db.relationship('User', back_populates='facility')
+    clients = db.relationship('Client', back_populates='facility')
+
+class Client(db.Model):
+    __tablename__ = 'clients'
+    id = db.Column(db.Integer, primary_key=True)
+    art_number = db.Column(db.String(80), unique=True)
+    full_name = db.Column(db.String(200))
+    age = db.Column(db.Integer)
+    gender = db.Column(db.String(20))
+    phone = db.Column(db.String(30))
+    address = db.Column(db.String(255))
+    village = db.Column(db.String(100))
+    coordinates = db.Column(db.String(100))  # lat,long
+    status = db.Column(db.String(50), default='active')  # active, IIT, defaulter, dead, transfer_out
+    facility_id = db.Column(db.Integer, db.ForeignKey('facilities.id'))
+    
+    # Tracking dates
+    last_pickup = db.Column(db.Date)
+    next_pickup = db.Column(db.Date)
+    last_vl = db.Column(db.Date)
+    next_vl = db.Column(db.Date)
+    last_eac = db.Column(db.Date)
+    next_eac = db.Column(db.Date)
+    last_cervical = db.Column(db.Date)
+    next_cervical = db.Column(db.Date)
+    
+    # Negative events
+    negative_event = db.Column(db.String(50))
+    negative_event_date = db.Column(db.Date)
+    negative_event_notes = db.Column(db.Text)
+    
+    facility = db.relationship('Facility', back_populates='clients')
+    tracking = db.relationship('Tracking', back_populates='client')
+
+class Tracking(db.Model):
+    __tablename__ = 'tracking'
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    intervention_date = db.Column(db.Date, default=datetime.utcnow)
+    intervention_type = db.Column(db.String(80))  # phone, home_visit, etc.
+    findings = db.Column(db.Text)
+    followup_date = db.Column(db.Date)
+    resolved = db.Column(db.Boolean, default=False)
+    
+    client = db.relationship('Client', back_populates='tracking')
+    user = db.relationship('User')
 load_dotenv()
 
 # Configuration
