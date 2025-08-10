@@ -3,13 +3,14 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from io import BytesIO
 import pandas as pd
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
+from sqlalchemy import inspect
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -29,7 +30,7 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 # --- Models ---
-class User(db.Model):
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
@@ -43,21 +44,6 @@ class User(db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
-    @property
-    def is_authenticated(self):
-        return True
-
-    @property
-    def is_active(self):
-        return self.approved
-
-    @property
-    def is_anonymous(self):
-        return False
-
-    def get_id(self):
-        return str(self.id)
 
 class Facility(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -103,11 +89,13 @@ class Tracking(db.Model):
 def initialize_database():
     """Safe database initialization that checks for existing tables"""
     with app.app_context():
-        inspector = db.inspect(db.engine)
+        # Only create tables if they don't exist
+        inspector = inspect(db.engine)
         existing_tables = inspector.get_table_names()
         
-        # Only create tables that don't exist
-        if 'user' not in existing_tables:
+        needed_tables = ['user', 'facility', 'client', 'tracking']
+        
+        if not all(table in existing_tables for table in needed_tables):
             db.create_all()
             
             # Add initial data if needed
@@ -117,12 +105,12 @@ def initialize_database():
                 db.session.commit()
 
 # --- Scheduler ---
-def init_scheduler():
-    def check_due_clients():
-        with app.app_context():
-            # Your existing scheduler code here
-            pass
+def check_due_clients():
+    with app.app_context():
+        # Your existing scheduler logic here
+        pass
 
+def init_scheduler():
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         scheduler = BackgroundScheduler()
         scheduler.add_job(func=check_due_clients, trigger="interval", days=1)
@@ -139,11 +127,12 @@ def create_app():
     # Initialize scheduler
     init_scheduler()
     
-    # Import and register blueprints/routes
-    from your_routes_file import bp  # Replace with your actual routes
-    app.register_blueprint(bp)
-    
     return app
+
+# --- Routes ---
+@app.route('/')
+def index():
+    return "Hello World"  # Replace with your actual routes
 
 # --- Run the Application ---
 if __name__ == '__main__':
