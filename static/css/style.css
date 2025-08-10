@@ -1,0 +1,18 @@
+body{font-family:Arial,Helvetica,sans-serif;background:#f3f6ff;margin:0;padding:0}
+.header{background:#fff;padding:16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0}
+.brand h1{color:#5a67d8;margin:0}
+.slogan{color:#666;margin:0;font-style:italic}
+.container{max-width:1100px;margin:20px auto;padding:16px}
+.btn{background:#5a67d8;color:#fff;padding:10px 14px;border-radius:8px;border:none;cursor:pointer;margin-right:8px}
+.btn-danger{background:#e53e3e}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0}
+.stat-card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);text-align:center}
+.stat-number{font-size:28px;color:#5a67d8}
+.stat-label{color:#666;font-weight:600}
+.login-screen{display:flex;align-items:center;justify-content:center;height:100vh}
+.login-card{background:#fff;padding:28px;border-radius:12px;box-shadow:0 6px 30px rgba(0,0,0,0.08);width:360px;text-align:center}
+.login-card input{width:100%;padding:10px;margin:8px 0;border-radius:6px;border:1px solid #e2e8f0}
+.alert{padding:8px;border-radius:6px;margin-bottom:8px}
+.alert-danger{background:#fed7d7;color:#742a2a}
+#clientsList table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+#clientsList th, #clientsList td{padding:12px;text-align:left;border-bottom:1px solid #f1f5f9}
