@@ -10,14 +10,14 @@ from io import BytesIO
 import pandas as pd
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect
 
 # Initialize Flask app
 app = Flask(__name__)
 
 # Configuration
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-change-in-production')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///app.db').replace('postgres://', 'postgresql://')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-me')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///worksmart.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'csv', 'xlsx', 'xls'}
@@ -53,7 +53,6 @@ class Facility(db.Model):
     location = db.Column(db.String(255))
     active = db.Column(db.Boolean, default=True)
     users = db.relationship('User', backref='facility', lazy=True)
-    clients = db.relationship('Client', backref='facility', lazy=True)
 
 class Client(db.Model):
     __tablename__ = 'clients'
@@ -90,47 +89,89 @@ class Tracking(db.Model):
     followup_date = db.Column(db.Date)
     resolved = db.Column(db.Boolean, default=False)
 
+# --- Routes ---
+@app.route('/')
+def home():
+    """Root endpoint that confirms the app is running"""
+    return jsonify({
+        'status': 'success',
+        'message': 'Application is running',
+        'database': str(db.engine.url),
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        facility_id = request.form.get('facility_id')
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password) and user.approved:
+            login_user(user)
+            session['facility_id'] = facility_id
+            return redirect(url_for('dashboard'))
+        
+        flash('Invalid credentials or account not approved', 'danger')
+    
+    facilities = Facility.query.filter_by(active=True).all()
+    return render_template('auth/login.html', facilities=facilities)
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    facility_id = session.get('facility_id')
+    stats = {
+        'active_clients': Client.query.filter_by(facility_id=facility_id, status='active').count(),
+        'due_pickup': Client.query.filter(
+            Client.facility_id == facility_id,
+            Client.status == 'active',
+            Client.next_pickup <= datetime.now().date()
+        ).count(),
+    }
+    return render_template('dashboard.html', stats=stats)
+
 # --- Database Initialization ---
 def initialize_database():
-    """Safe database initialization with migration checks"""
+    """Safe database initialization"""
     with app.app_context():
-        # Check if this is a fresh database
         inspector = inspect(db.engine)
-        if 'alembic_version' not in inspector.get_table_names():
-            # Initialize migrations if needed
-            from flask_migrate import init as migrate_init
-            migrate_init()
+        existing_tables = inspector.get_table_names()
         
-        # Apply any pending migrations
-        from flask_migrate import upgrade
-        upgrade()
-
-        # Seed initial data if needed
-        if Facility.query.count() == 0:
-            default_facility = Facility(
-                name='Main Facility',
-                location='Default Location',
-                active=True
-            )
-            db.session.add(default_facility)
+        # Only create tables if they don't exist
+        if 'users' not in existing_tables:
+            db.create_all()
             
-            admin_user = User(
+            # Add initial admin user
+            admin = User(
                 username='admin',
                 role='admin',
                 approved=True
             )
-            admin_user.set_password('admin')
-            db.session.add(admin_user)
+            admin.set_password('admin')
+            db.session.add(admin)
             
+            # Add default facility
+            facility = Facility(
+                name='Main Facility',
+                location='Default Location',
+                active=True
+            )
+            db.session.add(facility)
             db.session.commit()
 
-# --- Background Scheduler ---
-def init_scheduler():
-    def check_due_clients():
-        with app.app_context():
-            # Your existing scheduler logic here
-            pass
+# --- Scheduler ---
+def check_due_clients():
+    with app.app_context():
+        # Your existing scheduler logic here
+        pass
 
+def init_scheduler():
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         scheduler = BackgroundScheduler()
         scheduler.add_job(func=check_due_clients, trigger="interval", days=1)
@@ -138,48 +179,16 @@ def init_scheduler():
 
 # --- Application Factory ---
 def create_app():
-    # Create necessary directories
+    # Create upload directory
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     
-    # Initialize database
+    # Initialize database safely
     initialize_database()
     
     # Initialize scheduler
     init_scheduler()
     
     return app
-
-# --- Routes ---
-@app.route('/')
-def index():
-    return jsonify({
-        'status': 'success',
-        'message': 'Application is running',
-        'version': '1.0.0'
-    })
-
-# Include all your existing routes here
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    # Your login implementation
-    pass
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    # Your dashboard implementation
-    pass
-
-# [Include all other routes from your original implementation]
-
-# --- Error Handlers ---
-@app.errorhandler(404)
-def page_not_found(e):
-    return render_template('errors/404.html'), 404
-
-@app.errorhandler(500)
-def internal_error(e):
-    return render_template('errors/500.html'), 500
 
 # --- Run the Application ---
 if __name__ == '__main__':
