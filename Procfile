@@ -1,2 +1,1 @@
-processes:
-  web: gunicorn app:app
+start: gunicorn app:app
