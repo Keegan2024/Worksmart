@@ -10,7 +10,7 @@ from io import BytesIO
 import pandas as pd
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -31,12 +31,13 @@ login_manager.login_view = 'login'
 
 # --- Models ---
 class User(db.Model, UserMixin):
+    __tablename__ = 'users'  # Explicit table name to avoid conflicts
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
     role = db.Column(db.String(20), default='user')
     approved = db.Column(db.Boolean, default=False)
-    facility_id = db.Column(db.Integer, db.ForeignKey('facility.id'))
+    facility_id = db.Column(db.Integer, db.ForeignKey('facilities.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
@@ -46,6 +47,7 @@ class User(db.Model, UserMixin):
         return check_password_hash(self.password_hash, password)
 
 class Facility(db.Model):
+    __tablename__ = 'facilities'  # Explicit table name to avoid conflicts
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200))
     location = db.Column(db.String(255))
@@ -53,6 +55,7 @@ class Facility(db.Model):
     users = db.relationship('User', backref='facility', lazy=True)
 
 class Client(db.Model):
+    __tablename__ = 'clients'
     id = db.Column(db.Integer, primary_key=True)
     art_number = db.Column(db.String(50), unique=True, nullable=False)
     full_name = db.Column(db.String(100))
@@ -61,7 +64,7 @@ class Client(db.Model):
     phone = db.Column(db.String(20))
     village = db.Column(db.String(100))
     address = db.Column(db.Text)
-    facility_id = db.Column(db.Integer, db.ForeignKey('facility.id'))
+    facility_id = db.Column(db.Integer, db.ForeignKey('facilities.id'))
     status = db.Column(db.String(20), default='active')
     last_pickup = db.Column(db.Date)
     next_pickup = db.Column(db.Date)
@@ -76,9 +79,10 @@ class Client(db.Model):
     tracking = db.relationship('Tracking', backref='client', lazy=True)
 
 class Tracking(db.Model):
+    __tablename__ = 'tracking'
     id = db.Column(db.Integer, primary_key=True)
-    client_id = db.Column(db.Integer, db.ForeignKey('client.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     intervention_type = db.Column(db.String(50))
     intervention_date = db.Column(db.Date, default=datetime.utcnow().date)
     findings = db.Column(db.Text)
@@ -87,22 +91,31 @@ class Tracking(db.Model):
 
 # --- Database Initialization ---
 def initialize_database():
-    """Safe database initialization that checks for existing tables"""
+    """Completely safe database initialization"""
     with app.app_context():
-        # Only create tables if they don't exist
-        inspector = inspect(db.engine)
-        existing_tables = inspector.get_table_names()
-        
-        needed_tables = ['user', 'facility', 'client', 'tracking']
-        
-        if not all(table in existing_tables for table in needed_tables):
-            db.create_all()
+        # Check if migrations need to be applied
+        try:
+            # Check if the alembic_version table exists
+            result = db.session.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'alembic_version'
+                )
+            """)).scalar()
             
-            # Add initial data if needed
-            if Facility.query.count() == 0:
-                default_facility = Facility(name='Main Facility', location='Default Location')
-                db.session.add(default_facility)
-                db.session.commit()
+            if not result:
+                # Initialize migrations
+                from flask_migrate import upgrade
+                upgrade()
+                
+                # Add initial data
+                if Facility.query.count() == 0:
+                    default_facility = Facility(name='Main Facility', location='Default Location')
+                    db.session.add(default_facility)
+                    db.session.commit()
+        except Exception as e:
+            app.logger.error(f"Database initialization error: {str(e)}")
+            db.session.rollback()
 
 # --- Scheduler ---
 def check_due_clients():
@@ -132,7 +145,7 @@ def create_app():
 # --- Routes ---
 @app.route('/')
 def index():
-    return "Hello World"  # Replace with your actual routes
+    return "Application is running successfully"  # Replace with your actual routes
 
 # --- Run the Application ---
 if __name__ == '__main__':
