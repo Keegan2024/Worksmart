@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Worksmart — Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="login-screen">
+    <div class="login-card">
+      <h1>Worksmart</h1>
+      <p class="slogan">Track Easily</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-messages">
+            {% for cat, msg in messages %}
+              <div class="alert alert-{{cat}}">{{ msg }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <form method="post" action="{{ url_for('index') }}">
+        <label>Username</label><input name="username" required>
+        <label>Password</label><input name="password" type="password" required>
+        <button type="submit" class="btn">Login</button>
+      </form>
+      <div class="note">
+        Demo users: admin/admin123, pc001/pc123, lc001/lc123, cl001/cl123
+      </div>
+    </div>
+  </div>
+</body>
+</html>

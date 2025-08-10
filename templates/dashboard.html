@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Worksmart — Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <h1>Worksmart</h1>
+      <p class="slogan">Track Easily</p>
+    </div>
+    <div class="user-info">
+      <span>Welcome, {{ current_user.full_name }}</span>
+      <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+    </div>
+  </header>
+  <main class="container">
+    <section class="controls">
+      <button id="btnAddClient" class="btn">➕ Add Client</button>
+      <button id="btnReload" class="btn">🔄 Reload</button>
+    </section>
+    <section id="stats" class="stats-grid">
+      <div class="stat-card"><div class="stat-number" id="totalClients">0</div><div class="stat-label">Total Clients</div></div>
+      <div class="stat-card"><div class="stat-number" id="dueToday">0</div><div class="stat-label">Due Today</div></div>
+      <div class="stat-card"><div class="stat-number" id="overdue">0</div><div class="stat-label">Overdue</div></div>
+    </section>
+    <section id="clientsArea">
+      <h2>Clients</h2>
+      <div id="clientsList">Loading...</div>
+    </section>
+  </main>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
