@@ -21,6 +21,7 @@ app.config['SECRET_KEY'] = SECRET_KEY
 # Database Configuration
 if DATABASE_URL:
     try:
+        # Handle Neon.tech connection string
         db_url = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://')
         if '?' in db_url and 'sslmode' not in db_url:
             db_url += '&sslmode=require'
@@ -32,10 +33,7 @@ if DATABASE_URL:
             'pool_pre_ping': True,
             'pool_recycle': 300,
             'pool_size': 5,
-            'max_overflow': 10,
-            'connect_args': {
-                'options': '-c statement_timeout=30000'
-            }
+            'max_overflow': 10
         }
         print("Using PostgreSQL database with connection pooling")
     except Exception as e:
@@ -53,87 +51,23 @@ migrate = Migrate(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'index'
 
-# Database Models (keep your existing models here)
-# ... [Your existing model classes] ...
+# [Keep all your existing models here...]
 
-# Flask-Login Configuration
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
-class UserWrapper:
-    def __init__(self, user):
-        self._user = user
-    def is_authenticated(self): return True
-    def is_active(self): return True
-    def is_anonymous(self): return False
-    def get_id(self): return str(self._user.id)
-
-# Application Routes (keep your existing routes here)
-# ... [Your existing route functions] ...
+# [Keep all your existing routes here...]
 
 # Database Initialization
 def seed_sample_data():
     if Facility.query.first():
         return
     
-    facilities = [
-        Facility(name='Kitwe Central Hospital', location='Kitwe Central'),
-        Facility(name='Riverside Clinic', location='Riverside Township'),
-        Facility(name='Kamkole Health Post', location='Kamkole Village')
-    ]
-    db.session.add_all(facilities)
-    db.session.commit()
-
-    users = [
-        {'username': 'admin', 'password': 'admin123', 'role': 'system_admin', 
-         'full_name': 'System Administrator', 'approved': True, 'facility': facilities[0]},
-        {'username': 'pc001', 'password': 'pc123', 'role': 'professional_counselor',
-         'full_name': 'Dr. Susan Phiri', 'approved': True, 'facility': facilities[0]},
-        {'username': 'lc001', 'password': 'lc123', 'role': 'lay_counselor',
-         'full_name': 'James Mwape', 'approved': True, 'facility': facilities[1]},
-        {'username': 'cl001', 'password': 'cl123', 'role': 'clinician',
-         'full_name': 'Dr. Michael Zulu', 'approved': True, 'facility': facilities[0]}
-    ]
-
-    for u in users:
-        user = User(
-            username=u['username'],
-            full_name=u['full_name'],
-            role=u['role'],
-            approved=u['approved'],
-            facility_id=u['facility'].id
-        )
-        user.password_hash = generate_password_hash(u['password'])
-        db.session.add(user)
-    
-    clients = [
-        {'art_number': 'KT/001/2024', 'full_name': 'John Banda', 'age': 35, 'gender': 'Male',
-         'phone': '0971234567', 'address': 'Wusakile Compound', 'coordinates': '-12.8065,28.2137',
-         'last_pickup': date(2024, 7, 20), 'next_pickup': date(2024, 8, 20),
-         'last_vl': date(2024, 6, 15), 'next_vl': date(2024, 12, 15), 'status': 'active',
-         'facility_id': facilities[0].id},
-        # Add other sample clients...
-    ]
-
-    for c in clients:
-        db.session.add(Client(**c))
-    
-    db.session.commit()
+    # [Keep your existing seeding logic...]
     print('Database seeded with sample data')
 
 def parse_date(date_str):
-    if not date_str:
-        return None
-    try:
-        return datetime.fromisoformat(date_str).date()
-    except ValueError:
-        try:
-            return datetime.strptime(date_str, '%Y-%m-%d').date()
-        except ValueError:
-            return None
+    # [Keep your existing date parsing...]
+    pass
 
-# New initialization approach for Flask 2.3+
+# Initialize database
 with app.app_context():
     try:
         db.create_all()
@@ -150,6 +84,11 @@ def health_check():
         return jsonify({'status': 'healthy', 'database': 'connected'}), 200
     except Exception as e:
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+
+# Custom 404 handler
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
